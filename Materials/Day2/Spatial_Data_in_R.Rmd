@@ -11,8 +11,7 @@ knitr::opts_chunk$set(echo = TRUE, cache=TRUE)
 ```
 
 # Introduction
-Today we are going to get our first taste of working with movement data in R, but we will begin by
-introducing you to spatial data analysis in R more generally. In this section we will
+Today we are going to get our first taste of working with movement data in R, but we will begin by introducing you to spatial data analysis in R more generally. In this section we will
 review some of the R packages available for handling spatial data, discuss the
 format of different spatial data types, and explore how we can manipulate and visualize these
 in R. 
@@ -107,9 +106,9 @@ Now let's use the `st_read` function to read both files in separately. Note that
 within the `sf` library most commands begin with the "st" prefix. 
 
 ```{r}
-HK_boundary <- st_read("data_files/HK_boundary.shp")
+HK_boundary <- st_read("Materials/Day2/data_files/HK_boundary.shp")
 
-HK_districts <- st_read("data_files/HK_districts.shp")
+HK_districts <- st_read("Materials/Day2/data_files/HK_districts.shp")
 ```
 
 ### Attributes of `sf` objects
@@ -131,9 +130,9 @@ names(HK_districts)
 ```
 
 If we are ever curious about just the dataframe or just the geometry separately, 
-we can use `st_geometry` commands.  By setting the geometry to 'NULL' using `st_set_geometry`, a `sf`
-object returns to a simple data.frame. Calling the `st_geometry` from an sf object 
+we can use `st_geometry` commands.  By setting the geometry to 'NULL' using `st_set_geometry`, a `sf` object returns to a simple data.frame. Calling the `st_geometry` from an sf object 
 would extract just the spatial attributes turning this into a "simple feature collection" or "sfc". 
+
 To turn an `sfc` object back into an `sf` object use `st_sf()`.
 
 ```{r}
@@ -284,8 +283,7 @@ planimetric (in which the earth's coordinates are projected onto a two-dimension
 Most spatial operations in the sf library assume coordinates are projected into a
 planar surface which typically lend themselves to more interpretable measurements e.g meters or kilometers. 
 
-Above,  all our vector data have been in the
-WGS84 spherical coordinate reference system, which uses longitude and latitude with units in degrees.
+Above,  all our vector data have been in the WGS84 spherical coordinate reference system, which uses longitude and latitude with units in degrees.
 An example of this projection can be seen in the lower right depication of the US
 in the image below. 
 
@@ -303,7 +301,7 @@ library(raster)
 # https://landcover.usgs.gov/global_climatology.php
 # download.file("https://landcover.usgs.gov/documents/GlobalLandCover_tif.zip", "data_files/Landcover.zip") 
 # unzip("data_files/Landcover.zip", "data_files/")
-land_cover <- raster("data_files/LCType.tif")
+land_cover <- raster("Materials/Day2/data_files/HK_LC.tif")
 
 plot(land_cover)
 crs(land_cover)
