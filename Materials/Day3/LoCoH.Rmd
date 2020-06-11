@@ -37,6 +37,11 @@ We can see that we have 6371 data points for Toni. We can also see that the posi
 library(sp)
 library(rgdal)
 
+#This converts to a SpatialPointsDataFrame
+coordinates(toni) <- ~ long + lat 
+proj4string(toni) <- CRS("+proj=utm +south +zone=36 +ellps=WGS84")
+cr
+#This converts to a SpatialPoints object
 toni.sp.latlong <- SpatialPoints(toni[ , c("long","lat")], proj4string=CRS("+proj=longlat +ellps=WGS84"))
 toni.sp.utm <- spTransform(toni.sp.latlong, CRS("+proj=utm +south +zone=36 +ellps=WGS84")) 
 ```
@@ -73,6 +78,12 @@ The first step in using LoCoH is the creation of the fundamental LoCoH object: l
 
 ```{r}
 toni.lxy <- xyt.lxy(xy=toni.mat.utm, dt=toni.localtime, id="toni", proj4string=CRS("+proj=utm +south +zone=36 +ellps=WGS84"))
+
+#xy = matrix or dataframe containing the coordinates in UTM
+#dt = date-time values in POSIXct form in the correct time zone
+#id = name or id of the individual
+#proj4string= CRS projection
+
 ```
 
 It turns out there were 595 instances in the dataset of 6371 points where the timestamp and the coordinates were duplicated. In the creation of the lxy object, these points were removed, leaving a total of 5776 points. You could tell this from digging into our new lxy object which currently consists of 5 elements (in the form of a list): pts, dt.int, rw.params, anv, and comment.
