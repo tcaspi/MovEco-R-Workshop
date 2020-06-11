@@ -9,11 +9,177 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-1. Find and load unique movement data. This can be some of your own, or some pulled from movebank, 
-any other online source, or example data pulled from R packages. 
+1. Find and load unique movement data. This can be some of your own, or some pulled from movebank, any other online source, or example data pulled from R packages. 
+
+```{r}
+loginStored <- movebankLogin(username="tcaspi", password=pass)
+
+#get study ID - 
+getMovebankStudy(236023, login=loginStored)$citation
+
+#check for animal IDs - 
+getMovebankAnimals(236023, login=loginStored)
+
+carnivores <- getMovebankData(study = 236023, login = loginStored)
+
+class(carnivores)
+```
+
+
+```{r}
+loginStored <- movebankLogin(username="tcaspi", password=pass)
+
+#get study ID - 
+getMovebankStudy(10857031, login=loginStored)$citation
+
+#check for animal IDs - 
+getMovebankAnimals(10857031, login=loginStored)
+
+cats <- getMovebank("event", study_id = 10857031, login=loginStored)
+class(cats)
+ncats <- unique(cats$individual_id)
+length(ncats) #155 unique cats
+
+cats$timestamp <- as.POSIXct(cats$timestamp, format = "%Y-%m-%d %H:%M:%S" ) #format timestamp into datetime
+cats <- cats %>% na.omit() #remove NAs
+```
 
 2. Build a regular ltraj object and plot distributions of turning angles and 
 step lengths for each individual in your dataset
+
+```{r}
+
+carnivores.df <- as.data.frame(carnivores)
+coyotes.df <- carnivores.df %>% 
+  filter(taxon_canonical_name == "Canis latrans") 
+coyotes.df2 <- coyotes.df[, c("timestamp", "tag_id", "location_lat", "location_long", "individual_id")]
+coyotes.df2 <- na.omit(coyotes.df2)
+
+coyotes_sf <- 
+  coyotes.df2 %>% na.omit() %>%
+  st_as_sf(coords = c("location_long", "location_lat"), crs=4326)
+
+coyotes_sf %>% 
+  group_by(individual_id) %>% 
+  tally()
+
+coyotes_mov <- move(x=coyotes.df2$location_long,
+              y=coyotes.df2$location_lat,
+              time=coyotes.df2$timestamp,
+              data=coyotes.df2,
+              animal = as.factor(coyotes.df2$individual_id),
+              sensor = as.factor(coyotes.df2$tag_id),
+              proj=CRS("+proj=longlat"))
+
+coyotes_ltraj  <- as(coyotes_mov, 'ltraj')
+coyotes_ltraj
+
+unq_id <- unique(coyotes.df2$individual_id)
+n <- length(unq_id)
+
+hist(coyotes_ltraj[1], "dt", freq = T)
+hist(coyotes_ltraj[9], "dt", freq = T)
+
+median(coyotes_ltraj[[1]]$dt, na.rm = T) #supposed to take a fix every 3 minutes (180 seconds)
+median(coyotes_ltraj[[2]]$dt, na.rm = T)
+median(coyotes_ltraj[[6]]$dt, na.rm = T)
+median(coyotes_ltraj[[10]]$dt, na.rm = T)
+
+
+#Step lengths distributions WITHOUT turning to regular trajectory
+hist(coyotes_ltraj[[1]]$dist)
+hist(coyotes_ltraj[[2]]$dist)
+hist(coyotes_ltraj[[3]]$dist)
+hist(coyotes_ltraj[[4]]$dist)
+hist(coyotes_ltraj[[5]]$dist)
+hist(coyotes_ltraj[[6]]$dist)
+hist(coyotes_ltraj[[7]]$dist)
+hist(coyotes_ltraj[[8]]$dist)
+hist(coyotes_ltraj[[9]]$dist)
+hist(coyotes_ltraj[[10]]$dist)
+
+#Turning angles
+hist(coyotes_ltraj[[1]]$rel.angle)
+hist(coyotes_ltraj[[2]]$rel.angle)
+hist(coyotes_ltraj[[3]]$rel.angle)
+hist(coyotes_ltraj[[4]]$rel.angle)
+hist(coyotes_ltraj[[5]]$rel.angle)
+
+```
+
+
+```{r}
+#creating a Movestack object
+cats.mov <- move(x=cats$location_long,
+              y=cats$location_lat,
+              time=cats$timestamp,
+              data=cats,
+              animal = as.factor(cats$individual_id),
+              sensor = as.factor(cats$tag_id),
+              proj=CRS("+proj=longlat"))
+
+cat_ids <- split(cats.mov)
+
+cats_ltraj  <- as(cats.mov, 'ltraj') #creating the ltraj object
+cats_ltraj  #irregular type II 
+
+#Figuring out what to correct to to make regular
+hist(cats_ltraj[1], "dt", freq = T)
+hist(cats_ltraj[2], "dt", freq = T)
+hist(cats_ltraj[3], "dt", freq = T)
+hist(cats_ltraj[4], "dt", freq = T)
+hist(cats_ltraj[5], "dt", freq = T)
+
+median(cats_ltraj[[1]]$dt, na.rm = T) #supposed to take a fix every 3 minutes (180 seconds)
+median(cats_ltraj[[2]]$dt, na.rm = T)
+median(cats_ltraj[[3]]$dt, na.rm = T)
+median(cats_ltraj[[4]]$dt, na.rm = T)
+median(cats_ltraj[[5]]$dt, na.rm = T)
+
+#Cat 1 setting regulat
+cat1_raw <- cats_ltraj[1]
+cat1_raw[[1]]$date <- lubridate::force_tz(cat1_raw[[1]]$date, "EST") # hack to simplify timezones.
+
+## The reference date: the hour should be exact (i.e. minutes=0):
+ref <- strptime("00:00:00", "%H:%M:%S", tz="EST")
+
+cat1_raw %>% 
+  setNA(., ref, 3, units = "min") %>%  # set the missing values
+  sett0(., ref, 3, units = "min") -> cat1   # round the fixes to 3 min 
+
+is.regular(cat1)
+
+#Cat 2
+cat2_raw <- cats_ltraj[2]
+cat2_raw[[1]]$date <- lubridate::force_tz(cat2_raw[[1]]$date, "EST")
+
+cat2_raw %>% 
+  setNA(., ref, 3, units = "min") %>%  
+  sett0(., ref, 3, units = "min") -> cat2  
+
+is.regular(cat2)
+
+#Cat 3
+cat3_raw <- cats_ltraj[3]
+cat3_raw[[1]]$date <- lubridate::force_tz(cat3_raw[[1]]$date, "EST")
+
+cat3_raw %>% 
+  setNA(., ref, 3, units = "min") %>%  
+  sett0(., ref, 3, units = "min") -> cat3  
+
+is.regular(cat3)
+
+#Step Lengths
+
+cat1$dist
+
+cats_ltraj[100]$dist
+
+ibex[[1]]$dist
+
+hist(cats_ltraj[[1]]$dist)
+
+```
 
 3. Find an appropriate raster from an online data source. Below are a few options 
 to help you get started, alternatively just search "global gis data" or similar:

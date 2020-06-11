@@ -25,13 +25,10 @@ requiring careful consideration before analysis.
 Here we are going to focus on GPS relocation data as it is one of the most common
 forms of tracking data and provides a (mostly) consistent record of an animals movement path. 
 
-Justr as there are multiple semi-cooperative packages in R for working with spatial
-data generaly, there are many packages in R used to handle movement data, and
+Just as there are multiple semi-cooperative packages in R for working with spatial
+data generally, there are many packages in R used to handle movement data, and
 an ever growing number built for specific analyses. Unfortunately there is no strict
-consensus yet on which class
-movement data objects should be in across packages, and researchers often 
-have to be comfortable converting from one to the other depending on the task at hand and the 
-format required by each package. Although there are most definitely more R packages
+consensus yet on which class movement data objects should be in across packages, and researchers often have to be comfortable converting from one to the other depending on the task at hand and the format required by each package. Although there are most definitely more R packages
 created for dealing with animal movement data, we are going to focus today on the two most
 prominent `move` and `adehabitatLT`.
 
@@ -64,7 +61,7 @@ movebank username and password, here I
 have stored my password in my local environment as the variable `pass`. 
 
 ```{r, eval=FALSE}
-loginStored <- movebankLogin(username="dpseidel", password=pass)
+loginStored <- movebankLogin(username="tcaspi", password=pass)
 
 #search for studies - 
 searchMovebankStudies(x="albatross", login=loginStored)
@@ -82,10 +79,11 @@ write_tsv(albatross, "Study2911040")
 # getMovebank("event", login, study_id,...): returns the sensor measurements from a study. 
 # See also getMovebankData, getMovebankNonLocationData.
 ```
+
 To save us the effort of getting you all Movebank logins at this point, I have provided
 the tsv. We can use this to demonstrate the 3rd way of loading in movement data.
 ```{r}
-study <- read_tsv("data_files/Study2911040", comment="##",
+study <- read_tsv("Materials/Day2/data_files/Study2911040", comment="##",
                   col_types = "Tnncc")
 study <- as.data.frame(study)
                        
@@ -109,7 +107,7 @@ plot(albatross, type="l") # all of them
 If we are curious to compare behaviors across individuals, we can split the moveStack, 
 into separte move objects with the command `split`
 ```{r}
-ids <- split(albatross)
+ids <- split(albatross) #split into each individuals animal
 ```
 
 This allows us to plot and manipulate the individuals separately:
@@ -124,7 +122,6 @@ plot(ids[[3]], type='l', main= names(ids[3]))
 plot(ids[[4]], type='l', main= names(ids[4]))
 par(mfrow=c(1,1))
 ```
-
 
 And of course, just as before, we can manipulate, and clean up, this data easily when converted to an sf object:
 ```{r}
@@ -190,15 +187,15 @@ each "burst" and that this is an "irregular" "Type2" trajectory. Just what exact
 ### Side note: types of trajectory
 
 The adehabitat packages, and ltraj objects, distinguish between 2 types of trajectories:
-1. Trajectories of type I are characterized by the fact that the time is not
+1. Trajectories of *type I* are characterized by the fact that the time is not
 precisely known or not taken into account for the relocations of the
 trajectory (i.e. sampling of tracks in snow)
-2. Trajectories of type II are characterized by the fact that the time is
+2. Trajectories of *type II* are characterized by the fact that the time is
 known for each relocation. This type of trajectory is in turn be divided
 into two subtypes:
-  – regular trajectories: these trajectories are characterized by a constant
+  – *regular trajectories*: these trajectories are characterized by a constant
 time lag between successive relocations;
-  – irregular trajectories: these trajectories are characterized by a
+  – *irregular trajectories*: these trajectories are characterized by a
 variable time lag between successive relocations
 
 
@@ -260,7 +257,7 @@ we care about!
 If we dig into any one of our ltraj list objects, we'll see a dataframe 
 containing certain basic characteristics from our paths. Specifically: 
 
-- Step Length (i.e `dist`): the distance between successive relocations is often used in animal
+- *Step Length* (i.e `dist`): the distance between successive relocations is often used in animal
 movement analysis (e.g. Root and Kareiva 1984, Marsh and Jones 1988);
 ```{r}
 ibex[[1]]$dist
@@ -268,14 +265,13 @@ ibex[[1]]$dist
 hist(ibex[[1]]$dist)
 ```
 
-- Turning Angle (`rel.angle` v. `abs.angle`)
+- *Turning Angle* (`rel.angle` v. `abs.angle`)
 
 Your relative turning angle measures the change of direction between
 the step built by relocations i − 1 and i and the step built by relocations
 i and i + 1 (what we generally refer to as “turning angle”). It is often used together with
 the parameter dist to fit movement models (e.g. Root and Kareiva 1984,
-Marsh and Jones 1988). For comparison the absolute angle is the angle between the x direction and the step
-built by relocations i and i + 1. 
+Marsh and Jones 1988). For comparison the absolute angle is the angle between the x direction and the step built by relocations i and i + 1. 
 
 ```{r}
 ibex[[1]]$abs.angle
@@ -283,8 +279,7 @@ ibex[[1]]$rel.angle
 hist(ibex[[1]]$rel.angle)
 ```
 
-- Net Squared Displacement, i.e R2n,the squared distance between the first relocation of the trajectory
-and the current relocation is often used to test some movements models
+-*Net Squared Displacement*, i.e R2n,the squared distance between the first relocation of the trajectory and the current relocation is often used to test some movements models
 (e.g. the correlated random walk, see the seminal paper of Kareiva and
 Shigesada, 1983).
 
@@ -299,21 +294,22 @@ of animal movemnt paths.
 # Some Secondary Characteristics
 From this set of characteristics we can easily pull out secondary path characteristics like: 
 
-- Velocity: 
+- *Velocity*: 
 ```{r}
   ibex[[1]]$dist/ibex[[1]]$dt * 3.6 #convert meters per sec to kmph
 ```
 
-- First Passage Time
+- *First Passage Time* - the time taken for an animal to reach a specified site for the first time
 ```{r}
 # Calculate fpt for radii of a kilometer to 5 kilometers
-ibex_fpt <- fpt(ibex153, radii = seq(1000, 5000, 1000), units="hours")
+ibex_fpt <- fpt(ibex153, radii = seq(1000, 5000, 1000), units="hours") #radii = vector giving the radii of circles, in this case 1000, 2000, 3000, 4000, and 5000 m
+#Calculating the time taken for ibex153 to reach 1km, 2km, 3km, 4km, 5km from starting point
 
 # plot variation over time
-plot(ibex_fpt, scale=1000)
+plot(ibex_fpt, scale=1000) #fpt in hours on y-axis and date on the x-axis to reach 1km
 
 # plot mean fpt across scales
-meanfpt(fpt(ibex153, radii = seq(1000, 5000, 1000), units="hours"))
+meanfpt(fpt(ibex153, radii = seq(1000, 5000, 1000), units="hours")) #average time in hrs (fpt) to reach 1km, 2km, 3km, 4km, and 5km by ibex 153
 ```
 
 
