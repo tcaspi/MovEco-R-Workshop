@@ -199,3 +199,13 @@ lhs.save(toni.lhs.k15)
 ```
 
 There we have it, the Local Convex Hull approach to creating utilization distributions! We will take this further with the incorporation of the temporal component next.
+
+TESTING the code below
+```{r}
+LoCoH.k.area(xy = toni.sp.utm, k=25, percent=100, unin = c("m"),
+             unout = c("km2"),
+             duplicates=c("remove"))
+
+plot(objectabove, border = NA)
+```
+

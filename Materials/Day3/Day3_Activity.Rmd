@@ -11,11 +11,129 @@ knitr::opts_chunk$set(echo = TRUE)
 
 1. Choose movement data of your own or from a package. 
 
+```{r}
+library(tidyverse)
+library(sf)
+library(mapview)
+library(move)
+library(adehabitatLT)
+library(adehabitatHR)
+library(tlocoh)
+library(ggplot2)
+
+loginStored <- movebankLogin(username="tcaspi", password=pass)
+getMovebankStudy(2911040, login=loginStored)$citation
+getMovebankAnimals(2911040, login=loginStored) #checking for animal ids
+
+#getting data for only one individual
+albatross <- getMovebank("event", study_id = 2911040, login=loginStored, individual_id = 2911059)
+albatross <- na.omit(albatross)
+
+```
+
 2. Build a 100% MCP, 100% KDE_UD, 100% LoCoH_UD
+
+# Minimum Convex Polygon 
+```{r}
+lat_long <- SpatialPoints(na.omit(albatross)[,2:3])
+
+mcp <- mcp(lat_long, percent = 100)
+
+mcp_sf <- st_as_sf(mcp)
+lat_long_sf <- st_as_sf(lat_long)
+
+ggplot() + geom_sf(data = mcp_sf) + geom_sf(data = lat_long_sf)
+```
+
+#Kernel Density Estimate
+```{r}
+kud <- kernelUD(lat_long)  # h = href is the default - ad hoc method for determining h
+image(kud) + title("Albatross UD")
+
+k.area <- kernel.area(kud)
+plot(k.area)
+ver100 <- getverticeshr(kud) #getting the contours at 100%
+plot(ver100) + points(lat_long) #plot contours and GPS points
+```
+
+#Loco-H (100%)
+```{r}
+#first need to project coordinates into UTM
+albatross.sp.latlong <- SpatialPoints(na.omit(albatross[, c("location_lat", "location_long")]), proj4string = CRS("+proj=longlat +ellps=WGS84"))
+albatross.sp.utm <- spTransform(albatross.sp.latlong, CRS("+proj=utm +south +zone=15 +ellps=WGS84"))
+
+albatross.sp.utm <- spTransform(albatross.sp.latlong,CRS("+proj=laea +ellps=WGS84 +lon_0=147 +lat_0=-42"))
+
+albatross.mat <- coordinates(albatross.sp.latlong)
+
+#~~~
+
+#set time in datetime format
+albatross.tz <- as.POSIXct(albatross$timestamp, tz = "Pacific/Galapagos")
+toni.gmt <- as.POSIXct(toni$timestamp.utc, tz="UTC")
+
+#create the lxy object
+albatross.lxy <- xyt.lxy(xy = albatross.mat, dt = albatross.tz, id = "2911059" , proj4string = CRS("+proj=longlat +ellps=WGS84"))
+summary(albatross.lxy)
+hist(albatross.lxy)
+lxy.plot.freq(albatross.lxy, cp=T)
+albatross.lxy <- lxy.thin.bursts(albatross.lxy, thresh=0.99)
+
+#setting k nearest neighbors
+albatross.lxy <- lxy.nn.add(albatross.lxy, s=0, k=30)
+summary(albatross.lxy)
+#create hull sets with different values of k
+albatross.lhs <- lxy.lhs(albatross.lxy, k=3*1:10, s=0)
+plot(albatross.lhs, hulls=TRUE, figs.per.page=6)
+#create isopleths to reflect likelihood of occurence; specifically create 100% isopleth
+albatross.lhs <- lhs.iso.add(albatross.lhs, iso.levels=c(0.5, .95, 1))
+plot(albatross.lhs, iso=TRUE, figs.per.page=6)
+#take a closer look at selected homerange
+plot(albatross.lhs, iso=T, k=30, allpts=T, cex.allpts=0.1, col.allpts="gray30", ufipt=F)
+
+#plot isopleth area curves
+lhs.plot.isoarea(albatross.lhs) #at 30, the curve flattens out
+lhs.plot.isoear(albatross.lhs) #curve flattens out by ~10, but in the previous plot, not until k = 30
+
+#select the k value
+albatross.lhs.k30 <- lhs.select(albatross.lhs, k=30)
+
+```
+
 
 3. Plot home range area vs. percentage isopleth to see the relationship in your spatial data and how the separate home range estiamtors differ. (Similar to the output of `mcp.area` or `kernel.area`)
 
+```{r}
+
+plot(albatross.lhs.k30, allpts = T, hulls = T)
+plot(albatross.lhs.k30, iso = T)
+
+#extract isopleth polygons
+albatross.isos <- isopleths(albatross.lhs.k30)
+class(albatross.isos[[1]])
+albatross.isos[[1]]@data
+
+albatross.isos[[1]]
+
+albatross.hr <- albatross.isos[[1]][albatross.isos[[1]][["iso.level"]]==0.95, ]
+albatross.core <- albatross.isos[[1]][albatross.isos[[1]][["iso.level"]]==0.5, ]
+class(albatross.hr)
+plot(albatross.hr, border="blue")  
+plot(albatross.core, border="red")
+
+albatross.hr@polygons[[1]]@area
+
+```
+
 4. Try comparing outputs of k-LoCoH and a-LoCoH
+
+LoCoH.k(xy, k=5, unin = c("m", "km"),
+        unout = c("ha", "m2", "km2"),
+        duplicates=c("random","remove"), amount = NULL)
+
+LoCoH.a(xy, a, unin = c("m", "km"),
+        unout = c("ha", "m2", "km2"),
+        duplicates=c("random","remove"), amount = NULL)
 
 5. Try comparing across smoothing parameters and/or other kernel and hull methods found in the adehabitatHR library
 
