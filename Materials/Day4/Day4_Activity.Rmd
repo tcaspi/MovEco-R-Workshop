@@ -13,7 +13,128 @@ We are going to explore some of the functionality that we have demonstrated on e
 
 - 1. Select s and k (or a or r) values and build a T-LoCoH home range from your data or another data source. Why/how did you select those parameters?
 
+```{r}
+library(tidyverse)
+library(sf)
+library(mapview)
+library(move)
+library(adehabitatLT)
+library(adehabitatHR)
+library(tlocoh)
+library(ggplot2)
+
+loginStored <- movebankLogin(username="tcaspi", password=pass)
+getMovebankStudy(2911040, login=loginStored)$citation
+getMovebankAnimals(2911040, login=loginStored) #checking for animal ids
+
+#getting data for only one individual
+albatross <- getMovebank("event", study_id = 2911040, login=loginStored, individual_id = 2911091)
+albatross <- na.omit(albatross)
+
+#first need to project coordinates into UTM
+albatross.sp.latlong <- SpatialPoints(na.omit(albatross[, c("location_lat", "location_long")]), proj4string = CRS("+proj=longlat +ellps=WGS84"))
+albatross.sp.utm <- spTransform(albatross.sp.latlong, CRS("+proj=utm +south +zone=15 +ellps=WGS84"))
+
+albatross.mat.utm <- coordinates(albatross.sp.utm)
+colnames(albatross.mat.utm) <- c("x", "y")
+
+#set timestamps
+albatross.tz <- as.POSIXct(albatross$timestamp, tz = "Pacific/Galapagos")
+
+#create the lxy object
+albatross.lxy <- xyt.lxy(xy = albatross.mat.utm, dt = albatross.tz, id = "2911091" , proj4string = CRS("+proj=utm +south +zone=15 +ellps=WGS84"))
+summary(albatross.lxy)
+hist(albatross.lxy)
+lxy.plot.freq(albatross.lxy, cp=T)
+albatross.lxy <- lxy.thin.bursts(albatross.lxy, thresh=0.2)
+
+#setting k nearest neighbors
+albatross.lxy <- lxy.nn.add(albatross.lxy, s=0, k=25)
+summary(albatross.lxy)
+#create hull sets with different values of k
+albatross.lhs <- lxy.lhs(albatross.lxy, k=3*1:8, s=0)
+plot(albatross.lhs, hulls=TRUE, figs.per.page=6)
+#create isopleths to reflect likelihood of occurence; specifically create 100% isopleth
+albatross.lhs <- lhs.iso.add(albatross.lhs)
+plot(albatross.lhs, iso=TRUE, figs.per.page=6)
+#take a closer look at selected homerange
+plot(albatross.lhs, iso=T, k=18, allpts=T, cex.allpts=0.1, col.allpts="gray30", ufipt=F)
+
+#plot isopleth area curves
+lhs.plot.isoarea(albatross.lhs) 
+lhs.plot.isoear(albatross.lhs) 
+
+#select the k value
+albatross.lhs.k18 <- lhs.select(albatross.lhs, k=18)
+
+###starting process to pick the best s value
+albatross.lxy <- lxy.ptsh.add(albatross.lxy) #pick s value close to 0.01
+lxy.plot.pt2ctr(albatross.lxy)
+lxy.plot.sfinder(albatross.lxy)
+lxy.plot.sfinder(albatross.lxy, delta.t=3600*c(12,24,36,48,54,60))
+
+#selecting s = 0.01
+albatross.lxy <- lxy.nn.add(albatross.lxy, s=0.01, k=18)
+
+albatross.lhs.time <- lxy.lhs(albatross.lxy, k=3*3:8, s=0.01)
+albatross.lhs.time <- lhs.iso.add(albatross.lhs.time)
+plot(albatross.lhs.time, iso=TRUE, figs.per.page=6)
+albatross.lhs.time.k18 <- lhs.select(albatross.lhs.time, k=18)
+
+lhs.save(albatross.lhs.time.k18)
+
+#building hr and core area
+albatross.isos <- isopleths(albatross.lhs.time.k18)
+albatross.core <- albatross.isos[[1]][ albatross.isos[[1]][["iso.level"]]==0.75, ]
+albatross.hr <- albatross.isos[[1]][ albatross.isos[[1]][["iso.level"]]==0.95, ]
+
+plot(albatross.hr, border="green") 
+plot(albatross.core, border="purple", add= T)
+```
+
+
 - 2. Plot the revisitation and duration values. What biological explanation can you offer to explain the pattern visible in this plot?
 
+```{r}
+#adding ellipses
+albatross.lhs.time.k18 <- lhs.ellipses.add(albatross.lhs.time.k18)
+plot(albatross.lhs.time.k18, ellipses=TRUE)
+plot(albatross.lhs.time.k18, hulls=T, ellipses=T, allpts=T, nn=T, ptid="auto")
+
+#adding time information to look at revisitation and duration
+albatross.lhs.time.k18 <- lhs.visit.add(albatross.lhs.time.k18, ivg=3600*12) #12hrs
+summary(albatross.lhs.time.k18)
+
+#isopleths sorted by eccentricity -> areas where the individual moved in the most directed fashion
+albatross.lhs.time.k18 <- lhs.iso.add(albatross.lhs.time.k18, sort.metric="ecc")
+plot(albatross.lhs.time.k18, iso=T, iso.sort.metric="ecc")
+
+#revisitation
+hist(albatross.lhs.time.k18, metric="nsv")
+plot(albatross.lhs.time.k18, hpp=T, hpp.classify="nsv", ivg=3600*12, col.ramp="rainbow")
+#we can see that there is a core area with high revisitation, but most of the range is low visitation, only 1-3
+
+#duration
+hist(albatross.lhs.time.k18, metric="mnlv", ivg=3600*12)
+plot(albatross.lhs.time.k18, hpp=T, hpp.classify="mnlv", col.ramp="rainbow")
+
+```
+
 - 3. Use the T-LoCoH documentation to find the function for exporting a shapefile based on your isopleths or hulls. Bring that object back into your environment using the appropriate `sf` command. Then sample 100 points (once again using the `sf` package) from within the home range you defined earlier.
+
+```{r}
+#export loco hull set to shapefile
+albatross.shp <- lhs.exp.shp(lhs = albatross.lhs.time.k18, iso = T)
+
+library(sf)
+
+#read in shapefile
+albatross.range <- st_read("2911091.s0.01.k18.iso.srt-area.iso-q.h1338.i5.00.iso.shp")
+
+#select 100 points
+albatross.100pts <- st_sample(x = albatross.range, size = 100, type = "random")
+
+#plot shapefile plus 100 randomly selected points
+plot(albatross.range$geometry) ; plot(albatross.100pts, col = "blue", add = T)
+```
 

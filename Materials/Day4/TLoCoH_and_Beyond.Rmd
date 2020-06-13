@@ -25,7 +25,7 @@ library(tlocoh)
 toni.lhs.time.k15 <- lhs.ellipses.add(toni.lhs.time.k15)
 ```
 
-The first metics we are going to examine is called 'Elongation.' This is essentially a measure of the eccentircity of the bounding ellipsoid around each hull. For hulls that exhibit high elongation, we can assume the movement summmarized by that hull was directional in nature. On the other hand, hulls that are approximately circular may be more suggestive of foraging or resting behaviors. This is the first example of extracting some behavioral information from our movement trajectories, but it is far from the last example! As you can see from above, we used the `tlocoh::lhs.ellipses.add` command to do this and on my computer, it took a bit over 3 minutes.
+The first metics we are going to examine is called 'Elongation.' This is essentially a measure of the eccentricity of the bounding ellipsoid around each hull. For hulls that exhibit high elongation, we can assume the movement summmarized by that hull was directional in nature. On the other hand, hulls that are approximately circular may be more suggestive of foraging or resting behaviors. This is the first example of extracting some behavioral information from our movement trajectories, but it is far from the last example! As you can see from above, we used the `tlocoh::lhs.ellipses.add` command to do this and on my computer, it took a bit over 3 minutes.
 
 That's all very nice in theory, but let's see what it looks like in practice. First, we'll plot all of the ellipses we just created:
 
@@ -72,8 +72,8 @@ plot(toni.lhs.time.k15, hpp=T, hpp.classify="nsv", ivg=3600*12, col.ramp="rainbo
 The histogram shows that the majority of hulls were revisted fewer than 10 times, though there are some hulls that are visited almost 30 times! When we look at the plot of the movement track colored by the revistation rate, we can see where these areas of high revisitation are. Unexpectedly, these points are located in the core area, whereas the parent points of hulls with relatively few revisitations are along the periphery. These core areas likely represent regions that contain resources that Toni needed repeatedly. If we wanted to zoom in on a certain portion of the plot, we could use the area of interest command (`tlocoh::aoi`). Once we type this, we need to click on two points that represent the corners of the box we want to zoom in on (once again, these are commented out because they require active user input, so for the sake of 'knitting' they have been removed):
 
 ```{r}
-#toni.aoi <- aoi()
-#plot(toni.lhs.time.k15, hpp=T, hpp.classify="nsv", col.ramp="rainbow", aoi=toni.aoi)
+toni.aoi <- aoi()
+plot(toni.lhs.time.k15, hpp=T, hpp.classify="nsv", col.ramp="rainbow", aoi=toni.aoi)
 ```
 
 It could be interesting to lay an NDVI or some other GIS layer under these points to see if these hotspots of revistation correspond to some environmental component. 
@@ -87,8 +87,7 @@ plot(toni.lhs.time.k15, hpp=T, hpp.classify="mnlv", col.ramp="rainbow")
 
 This plot is almost the inverse of the previous. The points that were in the vicinity of the high revisitation areas exhibit lower durations of visit. The latter pattern is often associated with the presence of a watering hole in the home range. The  higher values of duration appear to occur along the periphery, but this is a bit misleading; it may actually be an artefact of the fact that we used the *k* method. Because we used *k*=15, every hull is constructed from 15 nearest neighors. Furthermore if there are no repeat visits to the area, the hull will consist of 15 temporally contiguous points -- a single 'visit' with 15 locations. This indicates that the *a* method may have been better, as it may have accounted for these outlying areas more effectively (i.e., there would be fewer neighbors for those points, and thus, lower durations of visits).
 
-The last thing we'll look at is a scatterplot of the hull revisitation and duration. We can use this as a map
-legend. Note how we use a spiral color pattern (instead of rainbow) to help us see where the points fall in the scatterplot, and we've also given the scatter plot a black background to make the colors stand out more. When we create the hull metric scatterplot, we save it as an object (hull.scatter) and then feed that object into the plot function for the hull parent points.
+The last thing we'll look at is a scatterplot of the hull revisitation and duration. We can use this as a map legend. Note how we use a spiral color pattern (instead of rainbow) to help us see where the points fall in the scatterplot, and we've also given the scatter plot a black background to make the colors stand out more. When we create the hull metric scatterplot, we save it as an object (hull.scatter) and then feed that object into the plot function for the hull parent points.
 
 ```{r}
 hull.scatter <- lhs.plot.scatter(toni.lhs.time.k15, x="nsv", y="mnlv", col="spiral", bg="black")
@@ -100,7 +99,7 @@ This map illustrates that the measures of time use are not randomly distributed.
 We can also take a look at a bunch of alternative scatter plots (48 in total) to see if there are any other metrics that might be more helpful for splitting space. 
 
 ```{r}
-#lhs.plot.scatter.auto(toni.lhs.time.k15)
+lhs.plot.scatter.auto(toni.lhs.time.k15)
 ```
 
 Now lets use this beautiful hullset that we created for Toni and take a look at its overlap with another one of the buffalo that the team tracked over the same time period, Pepper. Home range overlap is a common analysis for determining the potential for contact between two individuals, which is particularly important when you are interested in disease transmission. To do this, we'll load in an existing hullset that Andy has created and has placed on the R-Forge server for others to use:
