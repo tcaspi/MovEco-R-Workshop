@@ -25,28 +25,28 @@ http://ecosystems.psu.edu/research/labs/walter-lab/manual/chapter-8-resource-sel
 
 ## Step 1: Read in, Clean, and project all your Data
 ```{r}
-zebra <- read_csv("data_files/Zebra_Used_LatLong_Full.csv") %>% 
+zebra <- read_csv("Materials/Day5/data_files/Zebra_Used_LatLong_Full.csv") %>% 
   dplyr::select(ID = Name, 4:6) %>% 
   st_as_sf(., coords = 3:4, crs = "+init=epsg:4326") %>% 
   st_transform("+init=epsg:32733") %>% 
   mutate(timestamp = lubridate::mdy_hm(Date))
 
-water <- st_read("data_files/ENP shapefiles/functional water.shp") %>% 
+water <- st_read("Materials/Day5/data_files/ENP shapefiles/functional water.shp") %>% 
   st_transform("+init=epsg:32733")
 ggplot(water) + geom_sf()
 
-roads <- st_read("data_files/ENP shapefiles/enp roads.shp", crs = "+init=epsg:4326") %>% 
+roads <- st_read("Materials/Day5/data_files/ENP shapefiles/enp roads.shp", crs = "+init=epsg:4326") %>% 
   st_transform("+init=epsg:32733")
 ggplot(roads) + geom_sf()
 
-NDVI <- raster("data_files/NDVI_200903.tif") %>% 
+NDVI <- raster("Materials/Day5/data_files/NDVI_200903.tif") %>% 
   projectRaster(crs="+proj=utm +zone=33 +south +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0")
 ```
 
 ### Keep in mind temporal effects!
 RSF may be a spatial analysis but if we think selection or availability may 
 change over time, we must control for that in our models, either via appropriate 
-covariate inclusion, or simpky by limiting our scope. 
+covariate inclusion, or simply by limiting our scope. 
 
 ```{r}
 # NDVI was collected in March 2009... perhaps we should limit to only the rainy season months. 
@@ -54,7 +54,7 @@ covariate inclusion, or simpky by limiting our scope.
 
 zebra %>% 
   filter(lubridate::month(timestamp) %in% 1:3) %>% 
-  sf::select.sf(-Date) %>% 
+  sf:::select.sf(-Date) %>% 
   mutate(Used = 1) -> zebra
 ```
 
@@ -80,7 +80,7 @@ homerange
 # For now we are going to use these to sample available points. 
 # First I need to know how many points to sample in each home range. 
 
-zebra_ids <- unique(zebra$ID)
+zebra_ids <- unique(zebra$ID) #8 unique zerbra IDs (length(zebra_ids)) = 8
 availables <- list()
 for(i in 1:length(zebra_ids)){
   st_sample(st_as_sf(zebra_hr)[i,], 10*nrow(filter(zebra, ID == zebra_ids[i]))) %>% # sample individual UDs
@@ -102,9 +102,11 @@ availables %>%
 head(roads)
 unique(roads$TYPE)
 
-mapview(roads, homerange)
+mapview(homerange)
+mapview(roads)
 primary_roads <- filter(roads, TYPE %in% c("Tar", "Gravel"))
-mapview(primary_roads, homerange)
+mapview(primary_roads)
+mapview(primary_roads, homerange@map)
 
 # next step take 20 sec or so
 dist<- st_distance(y=zebra_all, x=primary_roads) # a units matrix dim =[nrow(x), nrow(y)]
@@ -121,8 +123,14 @@ head(water_dist)
 ```{r}
 zebra_all %>% mutate(NDVI = raster::extract(NDVI, as(., "Spatial")), 
                      dist_rd = road_dist,
-                     dist_H2O = water_dist) %>% 
-  group_by(ID) -> zebra_full
+                     dist_H2O = water_dist) -> zebra_all
+
+#now I'm going to chance zebra_all$ID into a factor BEFORE grouping, because I can't once it is grouped
+zebra_all$ID <- as_factor(zebra_all$ID)
+
+#now we can create zebra_full which is grouped by ID which is now  factor!
+zebra_all %>%   
+group_by(ID) -> zebra_full
 ```
 
 # Building the RSF
@@ -168,7 +176,7 @@ ability of your best model.
 ### Account for individual variation - glmer
 
 ```{r}
-zebra_full$ID <- as_factor(zebra_full$ID)
+#zebra_full$ID <- as_factor(zebra_full$ID) <- now unecessary because I did this before; this line of code does not work
 
 mm <- glmer(Used ~ scale(dist_rd) + scale(dist_H2O) + (1|ID), 
            data=zebra_full, family=binomial(link="logit"))
@@ -191,20 +199,23 @@ geotiff in the next chunk for further mapping.
 ```{r, eval=FALSE}
 
 # bring in boundary of area of interest
-ENP <- st_read("data_files/ENP shapefiles/enp fence poly.shp") %>% 
+ENP <- st_read("Materials/Day5/data_files/ENP shapefiles/enp fence poly.shp") %>% 
   st_union %>% st_transform("+init=epsg:32733")
 
+mapview(ENP, homerange@map)
+
 # Let's match the resolution of our NDVI layer
-# res(NDVI)
+res(NDVI)
 
 # make a grid and calculate distances
-enp_grid <- st_make_grid(ENP, n = c(1266, 476), what= "centers") 
+enp_grid <- st_make_grid(ENP, n = c(1266, 476), what= "centers") #this creates a square grid of 476 rows and 1266 columns covering the geometry of the ENP shapefile; which is a fence around the area the zebras roam(?)
+
 # convert to raster
 dist_raster <- raster(as(enp_grid, "Spatial"), ncol=1266, nrow= 476)
 
-# dist_road_grid <- st_distance(primary_roads, enp_grid)
+ dist_road_grid <- st_distance(primary_roads, enp_grid)
 dist_water_grid <- st_distance(water, enp_grid)
-# dist_raster[] = apply(dist_road_grid, 2, min)
+ dist_raster[] = apply(dist_road_grid, 2, min)
 dist_raster[] = apply(dist_water_grid, 2, min)
 
 
@@ -220,8 +231,8 @@ plot(st_geometry(water), add=TRUE)
 To do the above for both the water and road layers would take 5-10 mins, so instead
 let's read in the final rasters for processing:
 ```{r}
-dist_road <- raster("data_files/Dist_PrimaryRoads.tif") %>% flip(2)
-dist_water <- raster("data_files/Dist_Water.tif") %>% flip(2)
+dist_road <- raster("Materials/Day5/data_files/Dist_PrimaryRoads.tif") %>% flip(2)
+dist_water <- raster("Materials/Day5/data_files/Dist_Water.tif") %>% flip(2)
 
 # why are we using flip?
 # these files were created with st_distance function. gDistance would not require this. 
